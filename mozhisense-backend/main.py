@@ -1,15 +1,22 @@
 import json
 import random
 import sqlite3
+import asyncio
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import requests
+
+from engine.morphology_engine import get_morphological_distractors
 
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "db" / "mozhisense.db"
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "qwen:1.5b"
+OLLAMA_TIMEOUT_SECONDS = 4.5
 
 
 app = FastAPI(title="MozhiSense API", version="1.0.0")
@@ -118,6 +125,158 @@ def _fetch_senses_by_word(conn: sqlite3.Connection, word: str) -> list[sqlite3.R
     return conn.execute(query, (word,)).fetchall()
 
 
+def _normalize_blank_sentence(word: str, sentence: str) -> str:
+    text = (sentence or "").strip()
+    if not text:
+        return f"______ என்பது இந்த இடத்தில் '{word}' என்ற பொருளைக் குறிக்கிறது."
+
+    for blank in ["____", "_____", "_______", "________"]:
+        text = text.replace(blank, "______")
+
+    if "______" in text:
+        return text
+
+    if word and word in text:
+        return text.replace(word, "______", 1)
+
+    return f"______ {text}"
+
+
+def _build_generated_distractors(conn: sqlite3.Connection, word: str, pos: str) -> list[str]:
+    distractors: list[str] = []
+
+    try:
+        morph = get_morphological_distractors(word=word, pos=str(pos or "").title(), correct=word)
+        for item in morph:
+            value = str(item).strip()
+            if value and value != word and value not in distractors:
+                distractors.append(value)
+            if len(distractors) >= 3:
+                break
+    except Exception:
+        pass
+
+    if len(distractors) < 3:
+        rows = conn.execute(
+            "SELECT word_text FROM Words WHERE word_text != ? ORDER BY RANDOM() LIMIT 10",
+            (word,),
+        ).fetchall()
+        for row in rows:
+            value = str(row["word_text"]).strip()
+            if value and value != word and value not in distractors:
+                distractors.append(value)
+            if len(distractors) >= 3:
+                break
+
+    while len(distractors) < 3:
+        distractors.append(f"{word}{len(distractors) + 1}")
+
+    return distractors[:3]
+
+
+def _call_ollama_for_word(word: str) -> dict:
+    prompt = (
+        "You are creating one Tamil vocabulary challenge. "
+        f"For the word '{word}', return ONLY valid JSON with keys: "
+        "meaning, sentence_tamil, explanation, pos. "
+        "Rules: meaning in Tamil, sentence_tamil must contain exactly one '______' blank, "
+        "explanation in Tamil, pos one of Noun/Verb/Adjective/Adverb."
+    )
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.2, "top_p": 0.9, "num_predict": 180},
+    }
+
+    response = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT_SECONDS)
+    response.raise_for_status()
+    outer = response.json()
+    raw = str(outer.get("response", "")).strip()
+    if not raw:
+        raise ValueError("Empty Ollama response")
+
+    parsed = json.loads(raw)
+    meaning = str(parsed.get("meaning", "")).strip() or f"{word} என்பதன் பொருள்"
+    sentence = _normalize_blank_sentence(word, str(parsed.get("sentence_tamil", "")).strip())
+    explanation = str(parsed.get("explanation", "")).strip() or f"இந்த வாக்கியத்தில் '{word}' என்பது '{meaning}' என்பதைக் குறிக்கிறது."
+    pos = str(parsed.get("pos", "Noun")).strip().title() or "Noun"
+
+    return {
+        "meaning": meaning,
+        "sentence_tamil": sentence,
+        "explanation": explanation,
+        "pos": pos,
+    }
+
+
+def _generate_new_word_data_sync(word: str) -> dict:
+    with get_connection() as conn:
+        existing = _fetch_random_challenge(conn, "WHERE w.word_text = ?", (word,))
+        if existing is not None:
+            return _challenge_from_row(existing)
+
+        generated = _call_ollama_for_word(word)
+        meaning = generated["meaning"]
+        sentence_tamil = generated["sentence_tamil"]
+        explanation = generated["explanation"]
+        pos = generated["pos"]
+
+        conn.execute("INSERT OR IGNORE INTO Words(word_text) VALUES (?)", (word,))
+        word_row = conn.execute("SELECT id FROM Words WHERE word_text = ?", (word,)).fetchone()
+        if word_row is None:
+            raise RuntimeError(f"Failed to create word '{word}'")
+        word_id = int(word_row["id"])
+
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO Senses(word_id, meaning, english_translation, pos)
+            VALUES (?, ?, ?, ?)
+            """,
+            (word_id, meaning, meaning, pos),
+        )
+        sense_row = conn.execute(
+            """
+            SELECT id FROM Senses
+            WHERE word_id = ? AND meaning = ? AND english_translation = ? AND pos = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (word_id, meaning, meaning, pos),
+        ).fetchone()
+        if sense_row is None:
+            raise RuntimeError(f"Failed to create sense for '{word}'")
+        sense_id = int(sense_row["id"])
+
+        distractors = _build_generated_distractors(conn, word, pos)
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO Challenges(word_id, sense_id, sentence_tamil, correct_answer, distractors_json, explanation)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                word_id,
+                sense_id,
+                sentence_tamil,
+                word,
+                json.dumps(distractors, ensure_ascii=False),
+                explanation,
+            ),
+        )
+        conn.commit()
+
+        created = _fetch_random_challenge(conn, "WHERE w.word_text = ?", (word,))
+        if created is None:
+            raise RuntimeError(f"Challenge generation completed but fetch failed for '{word}'")
+        return _challenge_from_row(created)
+
+
+async def generate_new_word_data(word: str) -> dict:
+    return await asyncio.to_thread(_generate_new_word_data_sync, word)
+
+
 class AttemptRequest(BaseModel):
     user_id: str
     word: str
@@ -148,17 +307,24 @@ def get_words() -> list[dict]:
 
 
 @app.get("/api/challenge/{word}")
-def get_challenge_by_word(word: str) -> dict:
+async def get_challenge_by_word(word: str) -> dict:
     try:
         with get_connection() as conn:
             row = _fetch_random_challenge(conn, "WHERE w.word_text = ?", (word,))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Database error: {exc}") from exc
 
-    if row is None:
-        raise HTTPException(status_code=404, detail=f"No challenge found for word '{word}'")
+    if row is not None:
+        payload = _challenge_from_row(row)
+        payload["generated"] = False
+        return payload
 
-    return _challenge_from_row(row)
+    try:
+        payload = await generate_new_word_data(word)
+        payload["generated"] = True
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Generation failed for '{word}': {exc}") from exc
 
 
 @app.get("/api/word/{word}/senses")
@@ -227,8 +393,8 @@ def legacy_get_words() -> dict:
 
 
 @app.get("/challenges/{word}")
-def legacy_get_challenges_by_word(word: str) -> list[dict]:
-    challenge = get_challenge_by_word(word)
+async def legacy_get_challenges_by_word(word: str) -> list[dict]:
+    challenge = await get_challenge_by_word(word)
     return [challenge]
 
 

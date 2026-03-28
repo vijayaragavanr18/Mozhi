@@ -1,34 +1,139 @@
 import React, { useState, useEffect } from 'react';
-import { Mic, Star, BookOpen, Bookmark } from 'lucide-react';
+import { Mic, Star, BookOpen, Bookmark, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
-import { getSemanticGraph, getWordSenses } from '../api/mozhisense.js';
+import { getSemanticGraph, getWordSenses, getChallengesByWord } from '../api/mozhisense.js';
 
-const ExploreScreen = ({ selectedWord, setSelectedWord }) => {
+const ExploreScreen = ({ selectedWord, setSelectedWord, setScreen }) => {
   const [graphData, setGraphData] = useState(null);
   const [senses, setSenses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showArchitectLoader, setShowArchitectLoader] = useState(false);
+  const [loaderStep, setLoaderStep] = useState(0);
+  const [freshlyMinted, setFreshlyMinted] = useState(false);
+  const [generationFailed, setGenerationFailed] = useState(false);
+
+  const ARCHITECT_STEPS = [
+    'Searching WordNet...',
+    'Consulting LLM...',
+    'Applying Morphology Rules...',
+    'Finalizing Challenge...'
+  ];
 
   const rootWord = selectedWord || 'படி';
   const senseNodes = (graphData?.nodes || []).filter(node => String(node.id).startsWith('root:') === false);
 
   useEffect(() => {
     if (!rootWord) return;
+
+    let isMounted = true;
+    const startedAt = Date.now();
+
     setLoading(true);
     setError(null);
-    Promise.all([getSemanticGraph(rootWord), getWordSenses(rootWord)])
-      .then(([graph, senseList]) => {
+    setGenerationFailed(false);
+    setFreshlyMinted(false);
+
+    const delayedLoader = setTimeout(() => {
+      if (isMounted) {
+        setShowArchitectLoader(true);
+      }
+    }, 500);
+
+    const stepCycler = setInterval(() => {
+      if (isMounted) {
+        setLoaderStep((prev) => (prev + 1) % ARCHITECT_STEPS.length);
+      }
+    }, 1100);
+
+    (async () => {
+      try {
+        const challengeList = await getChallengesByWord(rootWord);
+        const wasGenerated = Boolean(challengeList?.[0]?.generated);
+        const [graph, senseList] = await Promise.all([getSemanticGraph(rootWord), getWordSenses(rootWord)]);
+        if (!isMounted) return;
         setGraphData(graph);
         setSenses(Array.isArray(senseList) ? senseList : []);
-      })
-      .catch(err => {
+        setFreshlyMinted(wasGenerated || Date.now() - startedAt > 500);
+      } catch (err) {
+        if (!isMounted) return;
+        const message = err?.message || 'Failed to load semantic data';
         console.error('Graph load error:', err);
-        setError(err.message || 'Failed to load semantic data');
+        setError(message);
         setGraphData(null);
         setSenses([]);
-      })
-      .finally(() => setLoading(false));
+
+        const isGenerationError = /generation failed|ollama|llm|connection|refused|timeout/i.test(message);
+        setGenerationFailed(isGenerationError);
+      } finally {
+        if (!isMounted) return;
+        setLoading(false);
+        setShowArchitectLoader(false);
+        setLoaderStep(0);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(delayedLoader);
+      clearInterval(stepCycler);
+    };
   }, [rootWord]);
+
+  if (generationFailed) {
+    return (
+      <div className="space-y-8 pb-20">
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="hardware-card backdrop-blur-md bg-surface-container-high/60 border border-outline-variant/20 drop-shadow-lg"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <Sparkles className="w-5 h-5 text-yellow-400" />
+            <p className="mono-text text-[10px] tracking-[0.3em] uppercase font-black text-yellow-400">AI Architect</p>
+          </div>
+          <h3 className="text-xl font-black mb-3">Our AI is currently resting.</h3>
+          <p className="text-sm text-text-muted mb-6">Try one of our 451 pre-built challenges!</p>
+          <button
+            onClick={() => setScreen && setScreen('play')}
+            className="px-6 py-3 rounded-xl bg-text-main text-background mono-text text-[10px] font-black tracking-[0.3em] hover:bg-primary hover:text-on-primary transition-all"
+          >
+            GO TO RANDOM CHALLENGE
+          </button>
+        </motion.section>
+      </div>
+    );
+  }
+
+  if (loading && showArchitectLoader) {
+    return (
+      <div className="space-y-8 pb-20">
+        <motion.section
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="hardware-card backdrop-blur-md bg-surface-container-high/60 border border-outline-variant/20 drop-shadow-lg"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <Sparkles className="w-5 h-5 text-yellow-400 animate-pulse" />
+            <p className="mono-text text-[10px] tracking-[0.3em] uppercase font-black text-yellow-400">AI Architect</p>
+          </div>
+          <p className="text-lg font-black text-text-main mb-2">Building semantic challenge for “{rootWord}”</p>
+          <p className="text-sm text-text-muted mb-5">{ARCHITECT_STEPS[loaderStep]}</p>
+
+          <div className="space-y-3">
+            <div className="h-5 w-2/3 rounded-md bg-surface-container animate-pulse" />
+            <div className="h-14 w-full rounded-xl bg-surface-container animate-pulse" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
+              <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
+              <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
+              <div className="h-12 rounded-xl bg-surface-container animate-pulse" />
+            </div>
+          </div>
+        </motion.section>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-12 pb-20">
@@ -118,6 +223,11 @@ const ExploreScreen = ({ selectedWord, setSelectedWord }) => {
             <div className="flex items-baseline gap-6">
               <h2 className="tamil-text text-6xl font-black premium-gradient-text">{rootWord}</h2>
               <span className="mono-text text-sm text-text-muted font-bold tracking-widest">[{rootWord}]</span>
+              {freshlyMinted && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-yellow-400/50 bg-yellow-400/10 text-yellow-300 text-[10px] mono-text font-black tracking-[0.18em] uppercase">
+                  <Sparkles className="w-3 h-3" /> Freshly Minted
+                </span>
+              )}
             </div>
             
             <div className="grid grid-cols-1 gap-8">

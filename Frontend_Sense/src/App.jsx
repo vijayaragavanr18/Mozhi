@@ -8,8 +8,10 @@ import HomeScreen from './screens/HomeScreen.jsx';
 import PlayScreen from './screens/PlayScreen.jsx';
 import ExploreScreen from './screens/ExploreScreen.jsx';
 import ProfileScreen from './screens/ProfileScreen.jsx';
+import LoginScreen from './screens/LoginScreen.jsx';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [screen, setScreen] = useState('home');
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('mozhi-theme');
@@ -49,11 +51,20 @@ export default function App() {
     switch (screen) {
       case 'home': return <HomeScreen setScreen={setScreen} setSelectedWord={setSelectedWord} xp={xp} streak={streak} />;
       case 'play': return <PlayScreen addXp={addXp} streak={streak} setStreak={setStreak} />;
-      case 'explore': return <ExploreScreen selectedWord={selectedWord} setSelectedWord={setSelectedWord} />;
+      case 'explore': return <ExploreScreen selectedWord={selectedWord} setSelectedWord={setSelectedWord} setScreen={setScreen} />;
       case 'profile': return <ProfileScreen theme={theme} setTheme={setTheme} xp={xp} streak={streak} />;
       default: return <HomeScreen setScreen={setScreen} setSelectedWord={setSelectedWord} xp={xp} streak={streak} />;
     }
   };
+
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true);
+    setScreen('home');
+  };
+
+  if (!isAuthenticated) {
+    return <LoginScreen onAuthSuccess={handleAuthSuccess} />;
+  }
 
   return (
     <div className="min-h-screen bg-background text-text-main pb-32 transition-colors duration-300">

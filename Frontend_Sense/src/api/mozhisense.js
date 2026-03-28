@@ -33,8 +33,10 @@ export const getWordSenses = async (word) => {
 
 // ── CHALLENGES ─────────────────────────────────────────
 
-export const getChallengesByWord = async (word) => {
-  const res = await fetch(`${API_BASE}/api/challenge/${encodeURIComponent(word)}`);
+export const getChallengesByWord = async (word, options = {}) => {
+  const res = await fetch(`${API_BASE}/api/challenge/${encodeURIComponent(word)}`, {
+    signal: options.signal,
+  });
   const challenge = await handleResponse(res);
   return [challenge];
 };
