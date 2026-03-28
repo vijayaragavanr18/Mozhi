@@ -1,0 +1,88 @@
+[
+  {
+    "word": "படி",
+    "senses": [
+      {
+        "meaning": "படிக்க",
+        "english_translation": "to read / study",
+        "pos": "Verb",
+        "morph_rule": "verb_suffix"
+      },
+      {
+        "meaning": "படிக்கட்டு",
+        "english_translation": "staircase / step",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      },
+      {
+        "meaning": "அளவு",
+        "english_translation": "a unit of measure",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      }
+    ]
+  },
+  {
+    "word": "ஆறு",
+    "senses": [
+      {
+        "meaning": "நதி",
+        "english_translation": "a river",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      },
+      {
+        "meaning": "ஆறு எண்",
+        "english_translation": "the number six",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      },
+      {
+        "meaning": "ஆறுதல்",
+        "english_translation": "to cool down / comfort",
+        "pos": "Verb",
+        "morph_rule": "verb_suffix"
+      }
+    ]
+  },
+  {
+    "word": "கல்",
+    "senses": [
+      {
+        "meaning": "கல்",
+        "english_translation": "stone / rock",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      },
+      {
+        "meaning": "கற்க",
+        "english_translation": "to learn",
+        "pos": "Verb",
+        "morph_rule": "verb_suffix"
+      }
+    ]
+  },
+  {
+    "word": "திங்கள்",
+    "senses": [
+      {
+        "meaning": "திங்கட்கிழமை",
+        "english_translation": "Monday",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      },
+      {
+        "meaning": "சந்திரன்",
+        "english_translation": "the moon",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      },
+      {
+        "meaning": "மாதம்",
+        "english_translation": "month",
+        "pos": "Noun",
+        "morph_rule": "noun_suffix"
+      }
+    ]
+  }
+]

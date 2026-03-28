@@ -1,19 +1,69 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Flame, Zap, BookOpen, Play, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { QUESTIONS } from '../data.js';
-import { recordAttempt } from '../api/mozhisense.js';
+import { recordAttempt, getRandomChallenge } from '../api/mozhisense.js';
 
 const PlayScreen = ({ addXp, streak, setStreak }) => {
   const [subTab, setSubTab] = useState('challenge');
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
+  const [questionError, setQuestionError] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
   const [isCorrect, setIsCorrect] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const dropZoneRef = useRef(null);
-  
-  const currentQuestion = QUESTIONS[currentQuestionIdx];
+
+  const TOTAL_QUESTIONS_FOR_PROGRESS = 50;
+
+  const mapChallengeToQuestion = (challenge) => {
+    const sentence = String(challenge?.sentence_tamil || '').trim();
+    const parts = sentence.split('______');
+    const sentenceBefore = parts[0] || '';
+    const sentenceAfter = parts.length > 1 ? parts.slice(1).join('______') : '';
+
+    const options = Array.isArray(challenge?.options)
+      ? challenge.options.filter(Boolean)
+      : [];
+
+    const correctAnswer = String(challenge?.correct_answer || '');
+    const correctIndex = options.findIndex((option) => option === correctAnswer);
+
+    return {
+      id: challenge?.challenge_id ?? `${challenge?.word || 'word'}-${challenge?.sense_id || Date.now()}`,
+      word: challenge?.word || '',
+      senseId: challenge?.sense_id || '',
+      sentenceBefore,
+      sentenceAfter,
+      options,
+      correctIndex,
+      explanation: challenge?.explanation || '',
+    };
+  };
+
+  const loadNextChallenge = async () => {
+    setLoadingQuestion(true);
+    setQuestionError(null);
+    try {
+      const challenge = await getRandomChallenge();
+      const question = mapChallengeToQuestion(challenge);
+      if (!question.options.length || question.correctIndex < 0) {
+        throw new Error('Invalid challenge payload from API');
+      }
+      setCurrentQuestion(question);
+    } catch (err) {
+      setQuestionError(err?.message || 'Failed to load challenge');
+    } finally {
+      setLoadingQuestion(false);
+    }
+  };
+
+  useEffect(() => {
+    if (subTab === 'challenge' && !currentQuestion) {
+      loadNextChallenge();
+    }
+  }, [subTab]);
 
   const handleDragEnd = (_event, info, idx) => {
     if (showFeedback) return;
@@ -30,14 +80,14 @@ const PlayScreen = ({ addXp, streak, setStreak }) => {
   };
 
   const handleCheck = async () => {
-    if (selectedOption === null) return;
+    if (selectedOption === null || !currentQuestion) return;
     const correct = selectedOption === currentQuestion.correctIndex;
     setIsCorrect(correct);
     setShowFeedback(true);
     
     setSubmitting(true);
     try {
-      await recordAttempt('user_001', currentQuestion.word || 'test', currentQuestion.id || 'q_' + currentQuestionIdx, correct);
+      await recordAttempt('user_001', currentQuestion.word || 'test', currentQuestion.senseId || currentQuestion.id, correct);
     } catch (err) {
       console.error('Failed to record attempt:', err);
     }
@@ -52,7 +102,8 @@ const PlayScreen = ({ addXp, streak, setStreak }) => {
     setSelectedOption(null);
     setIsCorrect(null);
     setShowFeedback(false);
-    setCurrentQuestionIdx((prev) => (prev + 1) % QUESTIONS.length);
+    setCurrentQuestionIdx((prev) => prev + 1);
+    loadNextChallenge();
   };
 
   return (
@@ -100,10 +151,27 @@ const PlayScreen = ({ addXp, streak, setStreak }) => {
             <div className="h-1.5 w-full bg-surface-container rounded-full mb-16 overflow-hidden">
               <motion.div 
                 initial={{ width: 0 }}
-                animate={{ width: `${((currentQuestionIdx + 1) / QUESTIONS.length) * 100}%` }}
+                animate={{ width: `${((currentQuestionIdx % TOTAL_QUESTIONS_FOR_PROGRESS) + 1) / TOTAL_QUESTIONS_FOR_PROGRESS * 100}%` }}
                 className="h-full bg-primary shadow-[0_0_10px_var(--primary)]"
               />
             </div>
+
+            {!currentQuestion || loadingQuestion ? (
+              <section className="hardware-card text-center py-16">
+                <p className="mono-text text-xs tracking-[0.25em] uppercase text-text-muted font-black">Loading Challenge...</p>
+              </section>
+            ) : questionError ? (
+              <section className="hardware-card text-center py-16 space-y-4">
+                <p className="mono-text text-xs tracking-[0.25em] uppercase text-red-500 font-black">Challenge Load Failed</p>
+                <p className="text-sm text-text-muted">{questionError}</p>
+                <button
+                  onClick={loadNextChallenge}
+                  className="px-8 py-3 bg-text-main text-background mono-text text-[10px] font-black tracking-[0.3em] rounded-xl"
+                >
+                  RETRY
+                </button>
+              </section>
+            ) : (
 
             <section className="hardware-card relative overflow-hidden mb-12">
               <div className="text-center mb-12">
@@ -163,11 +231,13 @@ const PlayScreen = ({ addXp, streak, setStreak }) => {
               </div>
             </section>
 
+            )}
+
             <div className="space-y-6">
               {!showFeedback ? (
                 <button 
                   onClick={handleCheck}
-                  disabled={selectedOption === null}
+                  disabled={selectedOption === null || !currentQuestion || loadingQuestion}
                   className="w-full py-6 bg-text-main text-background mono-text font-black tracking-[0.4em] text-xs rounded-2xl shadow-2xl transition-all active:scale-95 disabled:opacity-30 disabled:scale-100 hover:bg-primary hover:text-on-primary"
                 >
                   VALIDATE RESPONSE
