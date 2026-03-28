@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Flame, Zap, BookOpen, Play, CheckCircle2 } from 'lucide-react';
+import { Flame, Zap, BookOpen, Play, CheckCircle2, CircleAlert, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { recordAttempt, getRandomChallenge } from '../api/mozhisense.js';
 
@@ -34,6 +34,8 @@ const PlayScreen = ({ addXp, streak, setStreak }) => {
       id: challenge?.challenge_id ?? `${challenge?.word || 'word'}-${challenge?.sense_id || Date.now()}`,
       word: challenge?.word || '',
       senseId: challenge?.sense_id || '',
+      meaning: challenge?.meaning || '',
+      correctAnswer,
       sentenceBefore,
       sentenceAfter,
       options,
@@ -254,17 +256,78 @@ const PlayScreen = ({ addXp, streak, setStreak }) => {
               <AnimatePresence>
                 {showFeedback && (
                   <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className={`p-6 rounded-2xl flex items-start gap-4 border ${isCorrect ? 'bg-primary/5 border-primary/20 text-primary' : 'bg-red-500/5 border-red-500/20 text-red-500'}`}
+                    initial={{ opacity: 0, y: 28, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 22, bounce: 0.35 }}
+                    className={`relative overflow-hidden p-6 rounded-2xl border backdrop-blur-md drop-shadow-lg ${
+                      isCorrect
+                        ? 'bg-emerald-950/30 border-emerald-500 text-emerald-200'
+                        : 'bg-rose-950/30 border-rose-500 text-rose-200'
+                    }`}
                   >
-                    <div className="mt-1">
-                      {isCorrect ? <CheckCircle2 className="w-6 h-6" /> : <Zap className="w-6 h-6" />}
-                    </div>
-                    <div>
-                      <p className="font-black mono-text text-[10px] uppercase tracking-[0.2em] mb-1">{isCorrect ? 'Precision Achieved' : 'Learning Opportunity'}</p>
-                      <p className="font-bold text-sm leading-relaxed">{isCorrect ? 'Excellent semantic alignment. You earned 10 XP.' : currentQuestion.explanation}</p>
+                    {isCorrect && (
+                      <>
+                        <motion.span
+                          initial={{ opacity: 0, x: -30, y: 4, rotate: -20 }}
+                          animate={{ opacity: [0, 1, 1, 0.8], x: [0, -22, -34, -16], y: [0, -18, -34, -10], rotate: [-20, 0, 15, 8] }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className="absolute left-3 top-3 text-xl pointer-events-none"
+                        >
+                          🎉
+                        </motion.span>
+                        <motion.span
+                          initial={{ opacity: 0, x: 30, y: 4, rotate: 20 }}
+                          animate={{ opacity: [0, 1, 1, 0.8], x: [0, 22, 34, 16], y: [0, -18, -34, -10], rotate: [20, 0, -15, -8] }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className="absolute right-3 top-3 text-xl pointer-events-none"
+                        >
+                          🎊
+                        </motion.span>
+                        <motion.span
+                          initial={{ opacity: 0, x: -18, y: 14 }}
+                          animate={{ opacity: [0, 1, 0.7], x: [0, -28, -14], y: [0, -10, 0] }}
+                          transition={{ duration: 0.85, ease: 'easeOut' }}
+                          className="absolute left-8 top-10 text-base pointer-events-none"
+                        >
+                          ✨
+                        </motion.span>
+                        <motion.span
+                          initial={{ opacity: 0, x: 18, y: 14 }}
+                          animate={{ opacity: [0, 1, 0.7], x: [0, 28, 14], y: [0, -10, 0] }}
+                          transition={{ duration: 0.85, ease: 'easeOut' }}
+                          className="absolute right-8 top-10 text-base pointer-events-none"
+                        >
+                          🌟
+                        </motion.span>
+                      </>
+                    )}
+
+                    <div className="flex items-start gap-4">
+                      <div className="mt-1">
+                        {isCorrect ? <CheckCircle2 className="w-6 h-6 text-emerald-300" /> : <CircleAlert className="w-6 h-6 text-rose-300" />}
+                      </div>
+                      <div className="space-y-3">
+                        <p className="font-black mono-text text-[10px] uppercase tracking-[0.2em]">
+                          {isCorrect ? 'Perfect!' : 'Not quite...'}
+                        </p>
+
+                        <p className="font-bold text-sm leading-relaxed text-text-main">
+                          In this sentence, '<span className="text-yellow-400 font-bold">{currentQuestion.word || 'இந்த சொல்'}</span>' specifically refers to '{' '}
+                          <span className="text-yellow-400 font-bold">{currentQuestion.meaning || 'இந்த பொருள்'}</span>'.
+                        </p>
+
+                        {!isCorrect && (
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-yellow-300/70 bg-yellow-400/15 text-yellow-300 font-black text-sm">
+                            <Sparkles className="w-4 h-4" />
+                            Correct Answer: [{currentQuestion.correctAnswer || currentQuestion.options[currentQuestion.correctIndex] || ''}]
+                          </div>
+                        )}
+
+                        <p className="text-xs italic text-text-muted leading-relaxed">
+                          {currentQuestion.explanation || 'No additional explanation provided.'}
+                        </p>
+                      </div>
                     </div>
                   </motion.div>
                 )}
