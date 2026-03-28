@@ -1,0 +1,99 @@
+{
+  "படி": {
+    "transliteration": "padi",
+    "senses": [
+      {
+        "id": "padi_v1",
+        "pos": "Verb",
+        "meaning_en": "to read / study",
+        "meaning_ta": "படிக்க",
+        "example_en": "He studies for the exam"
+      },
+      {
+        "id": "padi_n1",
+        "pos": "Noun",
+        "meaning_en": "staircase / step",
+        "meaning_ta": "படிக்கட்டு",
+        "example_en": "The temple steps were tall"
+      },
+      {
+        "id": "padi_n2",
+        "pos": "Noun",
+        "meaning_en": "a unit of measure",
+        "meaning_ta": "அளவு",
+        "example_en": "He bought one measure of rice"
+      }
+    ]
+  },
+  "ஆறு": {
+    "transliteration": "aaru",
+    "senses": [
+      {
+        "id": "aaru_n1",
+        "pos": "Noun",
+        "meaning_en": "a river",
+        "meaning_ta": "நதி",
+        "example_en": "The fisherman caught fish in the river"
+      },
+      {
+        "id": "aaru_num1",
+        "pos": "Noun",
+        "meaning_en": "the number six",
+        "meaning_ta": "ஆறு எண்",
+        "example_en": "There are six mangoes"
+      },
+      {
+        "id": "aaru_v1",
+        "pos": "Verb",
+        "meaning_en": "to cool down / comfort",
+        "meaning_ta": "ஆறுதல்",
+        "example_en": "The hot rice cooled down"
+      }
+    ]
+  },
+  "கல்": {
+    "transliteration": "kal",
+    "senses": [
+      {
+        "id": "kal_n1",
+        "pos": "Noun",
+        "meaning_en": "stone / rock",
+        "meaning_ta": "கல்",
+        "example_en": "The sculptor carved the stone"
+      },
+      {
+        "id": "kal_v1",
+        "pos": "Verb",
+        "meaning_en": "to learn",
+        "meaning_ta": "கற்க",
+        "example_en": "We must learn good habits"
+      }
+    ]
+  },
+  "திங்கள்": {
+    "transliteration": "thingal",
+    "senses": [
+      {
+        "id": "thingal_n1",
+        "pos": "Noun",
+        "meaning_en": "Monday",
+        "meaning_ta": "திங்கட்கிழமை",
+        "example_en": "School starts on Monday"
+      },
+      {
+        "id": "thingal_n2",
+        "pos": "Noun",
+        "meaning_en": "the moon",
+        "meaning_ta": "சந்திரன்",
+        "example_en": "The moon shines at night"
+      },
+      {
+        "id": "thingal_n3",
+        "pos": "Noun",
+        "meaning_en": "month",
+        "meaning_ta": "மாதம்",
+        "example_en": "This month has thirty days"
+      }
+    ]
+  }
+}
