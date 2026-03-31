@@ -1,0 +1,9 @@
+[env]
+RAILWAY_STATIC_URL = "/static"
+
+[build]
+builder = "nixpacks"
+buildCommand = "cd mozhisense-backend && pip install --upgrade pip && pip install -r requirements.txt"
+
+[deploy]
+startCommand = "cd mozhisense-backend && bash start.sh"
