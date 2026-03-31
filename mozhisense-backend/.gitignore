@@ -1,0 +1,27 @@
+# Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.env
+.venv
+env/
+venv/
+*.db
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Stanza models (large files)
+models/stanza/
+
+# IDE
+.pytest_cache/
+.coverage
+htmlcov/

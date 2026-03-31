@@ -2,33 +2,35 @@ import json
 import random
 import sqlite3
 import asyncio
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
+from dotenv import load_dotenv
 
 from engine.morphology_engine import get_morphological_distractors
 
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "db" / "mozhisense.db"
-OLLAMA_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "qwen:1.5b"
-OLLAMA_TIMEOUT_SECONDS = 4.5
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen:1.5b")
+OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "4.5"))
+USE_OLLAMA = os.getenv("USE_OLLAMA", "true").lower() == "true"
 
 
 app = FastAPI(title="MozhiSense API", version="1.0.0")
 
+# Dynamic CORS origins
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -175,6 +177,15 @@ def _build_generated_distractors(conn: sqlite3.Connection, word: str, pos: str) 
 
 
 def _call_ollama_for_word(word: str) -> dict:
+    if not USE_OLLAMA:
+        # Return placeholder data when Ollama is disabled
+        return {
+            "meaning": f"{word} என்பதன் பொருள்",
+            "sentence_tamil": f"______ என்பது {word} என்ற பொருளைக் குறிக்கிறது.",
+            "explanation": f"இந்த வாக்கியத்தில் '{word}' பயன்படுத்தப்பட்டுள்ளது.",
+            "pos": "Noun",
+        }
+    
     prompt = (
         "You are creating one Tamil vocabulary challenge. "
         f"For the word '{word}', return ONLY valid JSON with keys: "
