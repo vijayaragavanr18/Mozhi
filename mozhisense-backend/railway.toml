@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pip install --upgrade pip && pip install -r requirements.txt"
+
+[deploy]
+startCommand = "gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app"
+restartPolicyMaxRetries = 5
